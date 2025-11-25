@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "852256361908",
+    "project_id": "runnershigh-eb8c7",
+    "storage_bucket": "runnershigh-eb8c7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:852256361908:android:76bdb5c71828630b1536e1",
+        "android_client_info": {
+          "package_name": "com.example.runnershigh"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAcUuLPc7fJrri8_jmvrnkU2MDLuUS9y8Q"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
