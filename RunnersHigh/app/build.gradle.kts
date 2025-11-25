@@ -66,5 +66,12 @@ dependencies {
 
     // Google 로그인용
     implementation("com.google.android.gms:play-services-auth:21.1.0")
+    // Retrofit
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
 
+    // OkHttp 로깅 (선택이지만 있으면 디버깅 편함)
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.google.code.gson:gson:2.10.1")
 }
