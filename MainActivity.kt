@@ -40,7 +40,7 @@ import java.util.Locale
 import kotlin.math.cos
 import kotlin.math.sin
 
-// API 응답 데이터 모델
+// 월별 활동 API 응답 데이터 모델
 data class ActivitySummaryResponse(
     val userId: String,
     val year: Int,
@@ -122,11 +122,11 @@ suspend fun fetchPerformanceComparison(userId: String, days: Int = 7): Performan
     }
 }
 
-// API 호출 함수
+// 월별 활동 요약 API 호출 함수
 suspend fun fetchActivitySummary(userId: String, year: Int, month: Int): ActivitySummaryResponse? {
     return withContext(Dispatchers.IO) {
         try {
-            val url = "http://127.0.0.1:5001/runners-high-capstone/us-central1/activity_summary_api?userId=$userId&year=$year&month=$month"
+            val url = "http://127.0.0.1:5001/runners-high-capstone/us-central1/activity_summary_api?userId=user-1234&year=2025&month=1"
             val response = URL(url).readText()
             val json = JSONObject(response)
 
@@ -223,7 +223,7 @@ suspend fun fetchRecentActivities(userId: String, limit: Int = 5): List<RecentAc
 suspend fun fetchMonthlyAverage(userId: String, year: Int, month: Int): MonthlyAverageResponse? {
     return withContext(Dispatchers.IO) {
         try {
-            val url = "http://127.0.0.1:5001/runners-high-capstone/us-central1/activity/monthly_average?userId=$userId&year=$year&month=$month"
+            val url = "http://127.0.0.1:5001/runners-high-capstone/us-central1//activity/summary/total?userId={userId}"
             val response = URL(url).readText()
             val json = JSONObject(response)
 
@@ -512,7 +512,7 @@ suspend fun fetchWeeklyCondition(userId: String, year: Int, month: Int): WeeklyC
     }
 }
 
-// 종합 컨디션 분석 API 호출 함수
+// 종합 컨디션 분석(종합 평가) API 호출 함수
 suspend fun fetchOverallCondition(userId: String): OverallConditionResponse? {
     return withContext(Dispatchers.IO) {
         try {
@@ -591,7 +591,7 @@ suspend fun fetchMonthlyActivity(userId: String, year: Int): MonthlyActivityResp
     }
 }
 
-// 전체 활동 타임라인 API 호출 함수
+// 전체 활동량 그래프 데이터 조회 API 호출 함수
 suspend fun fetchTotalActivity(userId: String): TotalActivityResponse? {
     return withContext(Dispatchers.IO) {
         try {
