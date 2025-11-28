@@ -66,14 +66,7 @@
                         android:textStyle="bold"
                         android:textColor="#333333"/>
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="STARTER"
-                        android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:textColor="#333333"
-                        android:layout_alignParentEnd="true"/>
+
                 </RelativeLayout>
 
                 <RelativeLayout
@@ -118,13 +111,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="NEXT Level: CHALLENGER"
-                        android:textSize="12sp"
-                        android:textColor="#333333"
-                        android:textStyle="bold"/>
+
 
                     <TextView
                         android:id="@+id/tv_exp_remaining"
@@ -233,22 +220,9 @@
                     </LinearLayout>
                 </LinearLayout>
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="5dp"
-                    android:background="#000000"
-                    android:layout_marginBottom="16dp"/>
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical">
 
-                    <include layout="@layout/item_condition_check" android:id="@+id/condition_check_1"/>
-                    <include layout="@layout/item_condition_check" android:id="@+id/condition_check_2"/>
-                    <include layout="@layout/item_condition_check" android:id="@+id/condition_check_3"/>
 
-                </LinearLayout>
 
             </LinearLayout>
         </androidx.cardview.widget.CardView>

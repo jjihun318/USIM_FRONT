@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -35,6 +36,7 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
     private lateinit var missionCategory1: TextView
     private lateinit var lvRate1: ProgressBar
     private lateinit var missionLayout1: View
+    private lateinit var icCheckImage1: ImageView
 
     // 미션 2
     private lateinit var lvTitle2: TextView
@@ -44,6 +46,7 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
     private lateinit var missionCategory2: TextView
     private lateinit var lvRate2: ProgressBar
     private lateinit var missionLayout2: View
+    private lateinit var icCheckImage2: ImageView
 
     // 미션 3
     private lateinit var lvTitle3: TextView
@@ -53,6 +56,7 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
     private lateinit var missionCategory3: TextView
     private lateinit var lvRate3: ProgressBar
     private lateinit var missionLayout3: View
+    private lateinit var icCheckImage3: ImageView
 
     // 레벨 기본값
     private val EXP_PER_LEVEL = 1000
@@ -108,8 +112,8 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
         lvDescription1 = findViewById(R.id.lv_description_1)
         lvExp1 = findViewById(R.id.lv_exp_1)
         lvProgress1 = findViewById(R.id.lv_progress_1)
-
         lvRate1 = findViewById(R.id.lv_rate_1)
+        icCheckImage1 = findViewById(R.id.ic_check_image1)
 
         // 미션 2 UI 요소 연결
         missionLayout2 = findViewById(R.id.lv_title_2)
@@ -117,8 +121,8 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
         lvDescription2 = findViewById(R.id.lv_description_2)
         lvExp2 = findViewById(R.id.lv_exp_2)
         lvProgress2 = findViewById(R.id.lv_progress_2)
-
         lvRate2 = findViewById(R.id.lv_rate_2)
+        icCheckImage2 = findViewById(R.id.ic_check_image2)
 
         // 미션 3 UI 요소 연결
         missionLayout3 = findViewById(R.id.lv_title_3)
@@ -126,8 +130,8 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
         lvDescription3 = findViewById(R.id.lv_description_3)
         lvExp3 = findViewById(R.id.lv_exp_3)
         lvProgress3 = findViewById(R.id.lv_progress_3)
-
         lvRate3 = findViewById(R.id.lv_rate_3)
+        icCheckImage3 = findViewById(R.id.ic_check_image3)
 
         // 🌟 미션 레이아웃 visibility는 XML에서 설정한 대로 유지
         // (XML에서 visible로 설정했다면 그대로 보임)
@@ -224,12 +228,22 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
             val mission1 = missions[0]
             lvTitle1.text = mission1.missionName
             lvDescription1.text = mission1.missionDescription
-            lvExp1.text = "${mission1.expPoints} EXP"
             lvProgress1.text = mission1.progressStatus
             missionCategory1.text = mission1.missionCategory
             lvRate1.max = 100
             lvRate1.progress = mission1.gaugeRatio
             missionLayout1.visibility = View.VISIBLE
+
+            // 미션 완료 체크
+            if (mission1.gaugeRatio >= 100) {
+                lvRate1.visibility = View.GONE
+                icCheckImage1.visibility = View.VISIBLE
+                lvExp1.text = "COMPLETE!"
+            } else {
+                lvRate1.visibility = View.VISIBLE
+                icCheckImage1.visibility = View.GONE
+                lvExp1.text = "+${mission1.expPoints} EXP"
+            }
         }
 
         // 두 번째 미션
@@ -237,12 +251,22 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
             val mission2 = missions[1]
             lvTitle2.text = mission2.missionName
             lvDescription2.text = mission2.missionDescription
-            lvExp2.text = "${mission2.expPoints} EXP"
             lvProgress2.text = mission2.progressStatus
             missionCategory2.text = mission2.missionCategory
             lvRate2.max = 100
             lvRate2.progress = mission2.gaugeRatio
             missionLayout2.visibility = View.VISIBLE
+
+            // 미션 완료 체크
+            if (mission2.gaugeRatio >= 100) {
+                lvRate2.visibility = View.GONE
+                icCheckImage2.visibility = View.VISIBLE
+                lvExp2.text = "COMPLETE!"
+            } else {
+                lvRate2.visibility = View.VISIBLE
+                icCheckImage2.visibility = View.GONE
+                lvExp2.text = "+${mission2.expPoints} EXP"
+            }
         }
 
         // 세 번째 미션
@@ -250,12 +274,22 @@ class MainActivity : AppCompatActivity(), CoroutineScope {
             val mission3 = missions[2]
             lvTitle3.text = mission3.missionName
             lvDescription3.text = mission3.missionDescription
-            lvExp3.text = "${mission3.expPoints} EXP"
             lvProgress3.text = mission3.progressStatus
             missionCategory3.text = mission3.missionCategory
             lvRate3.max = 100
             lvRate3.progress = mission3.gaugeRatio
             missionLayout3.visibility = View.VISIBLE
+
+            // 미션 완료 체크
+            if (mission3.gaugeRatio >= 100) {
+                lvRate3.visibility = View.GONE
+                icCheckImage3.visibility = View.VISIBLE
+                lvExp3.text = "COMPLETE!"
+            } else {
+                lvRate3.visibility = View.VISIBLE
+                icCheckImage3.visibility = View.GONE
+                lvExp3.text = "+${mission3.expPoints} EXP"
+            }
         }
     }
 

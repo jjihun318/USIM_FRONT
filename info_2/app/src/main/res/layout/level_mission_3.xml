@@ -20,7 +20,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:id="@+id/lv_title_3"
-                android:text="5km 마라톤 행사 참여"
+                android:text="일주일에 3번 5km 러닝하기"
                 android:textSize="16sp"
                 android:textStyle="bold"
                 android:textColor="#333333"/>
@@ -28,42 +28,50 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:id="@+id/lv_progress_3"
-                android:text=""
+                android:text="1/3"
                 android:textSize="12sp"
                 android:textColor="#888888"
                 android:layout_alignParentEnd="true"/>
         </RelativeLayout>
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:id="@+id/lv_description_3"
-            android:text="정신력 강화로 체력 한계 돌파"
-            android:textSize="12sp"
-            android:textColor="#666666"/>
 
+        <RelativeLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/lv_description_3"
+                android:text="꾸준한 훈련으로 체력 향상"
+                android:textSize="12sp"
+                android:textColor="#666666"/>
+
+            <ImageView
+                android:id="@+id/ic_check_image3"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_alignParentEnd="true"
+                android:layout_marginEnd="7dp"
+                android:src="@drawable/ic_check"
+                app:tint="#86B94E"
+                android:visibility="gone"/>
+        </RelativeLayout>
         <ProgressBar
             style="@style/Widget.AppCompat.ProgressBar.Horizontal"
             android:layout_width="match_parent"
-            android:layout_height="10dp"
             android:id="@+id/lv_rate_3"
+            android:layout_height="10dp"
             android:progress="33"
             android:max="100"
             android:progressTint="#86B94E"
             android:progressBackgroundTint="#B8D786"
             android:layout_marginTop="12dp"
-            android:layout_marginBottom="4dp"
-            android:visibility="invisible"/>
+            android:layout_marginBottom="4dp"/>
 
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content">
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:id="@+id/mission_category_3"
-                android:text="STARTER MISSION"
-                android:textSize="10sp"
-                android:textColor="#86B94E"/>
+
 
             <TextView
                 android:layout_width="62dp"
