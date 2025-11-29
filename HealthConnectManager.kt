@@ -1,17 +1,34 @@
 package com.example.myapplication
 
 import android.content.Context
+import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.*
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import com.example.myapplication.network.RetrofitClient
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.Duration
+
+// 서버 전송용 데이터 클래스
+data class HealthSyncRequest(
+    val stepCount: Int,
+    val caloriesBurned: Int,
+    val distanceWalked: Int,
+    val avgHeartRate: Int,
+    val avgHRV: Double,
+    val avgRestingHeartRate: Int,
+    val sleepDurationMinutes: Int,
+    val deepSleepMinutes: Int,
+    val lightSleepMinutes: Int,
+    val remSleepMinutes: Int,
+    val awakeSleepMinutes: Int
+)
 
 class HealthConnectManager(private val context: Context) {
 
@@ -23,6 +40,8 @@ class HealthConnectManager(private val context: Context) {
         HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
         HealthPermission.getReadPermission(DistanceRecord::class),
         HealthPermission.getReadPermission(SleepSessionRecord::class),
+        HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+        HealthPermission.getReadPermission(RestingHeartRateRecord::class),
     )
 
     // ✅ [Aggregate] 걸음수 총합 (Int 반환)
@@ -87,6 +106,48 @@ class HealthConnectManager(private val context: Context) {
             timeRangeFilter = TimeRangeFilter.between(todayStart, todayEnd)
         )
         return healthConnectClient.readRecords(request).records
+    }
+
+    // [ReadRecords] 심박수 변이도 (HRV RMSSD)
+    suspend fun readHeartRateVariability(): List<HeartRateVariabilityRmssdRecord> {
+        val todayStart = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val todayEnd = LocalDate.now().atTime(LocalTime.MAX).atZone(ZoneId.systemDefault()).toInstant()
+
+        val request = ReadRecordsRequest(
+            recordType = HeartRateVariabilityRmssdRecord::class,
+            timeRangeFilter = TimeRangeFilter.between(todayStart, todayEnd)
+        )
+        return healthConnectClient.readRecords(request).records
+    }
+
+    // [분석] 오늘의 평균 HRV (밀리초 단위)
+    suspend fun getTodayAverageHRV(): Double {
+        val records = readHeartRateVariability()
+        if (records.isEmpty()) return 0.0
+
+        val avgMillis = records.map { it.heartRateVariabilityMillis }.average()
+        return avgMillis
+    }
+
+    // [ReadRecords] 안정 심박수 (RHR)
+    suspend fun readRestingHeartRate(): List<RestingHeartRateRecord> {
+        val todayStart = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant()
+        val todayEnd = LocalDate.now().atTime(LocalTime.MAX).atZone(ZoneId.systemDefault()).toInstant()
+
+        val request = ReadRecordsRequest(
+            recordType = RestingHeartRateRecord::class,
+            timeRangeFilter = TimeRangeFilter.between(todayStart, todayEnd)
+        )
+        return healthConnectClient.readRecords(request).records
+    }
+
+    // [분석] 오늘의 평균 안정 심박수 (BPM)
+    suspend fun getTodayAverageRestingHeartRate(): Int {
+        val records = readRestingHeartRate()
+        if (records.isEmpty()) return 0
+
+        val avgBpm = records.map { it.beatsPerMinute }.average()
+        return avgBpm.toInt()
     }
 
     // ✅ [ReadRecords] 최근 수면 세션 (지난 48시간 내)
@@ -173,5 +234,49 @@ class HealthConnectManager(private val context: Context) {
             sleepStartTime = startTimeStr,
             sleepEndTime = endTimeStr
         )
+    }
+
+    // 모든 헬스 데이터를 수집하고 서버로 전송
+    suspend fun syncHealthDataToServer() {
+        try {
+            // 모든 데이터 수집
+            val stepCount = getTodayStepCount()
+            val caloriesBurned = getTodayCaloriesBurned()
+            val distanceWalked = getTodayDistanceWalked()
+
+            val heartRateRecords = readHeartRates()
+            val allSamples = heartRateRecords.flatMap { it.samples }
+            val avgHeartRate = if (allSamples.isNotEmpty()) {
+                allSamples.map { it.beatsPerMinute }.average().toInt()
+            } else 0
+
+            val avgHRV = try { getTodayAverageHRV() } catch (e: Exception) { 0.0 }
+            val avgRHR = try { getTodayAverageRestingHeartRate() } catch (e: Exception) { 0 }
+
+            val sleepDuration = getLatestSleepDuration()
+            val sleepStageInfo = getLatestSleepStageInfo()
+
+            // 서버 전송용 객체 생성
+            val healthSyncRequest = HealthSyncRequest(
+                stepCount = stepCount,
+                caloriesBurned = caloriesBurned,
+                distanceWalked = distanceWalked,
+                avgHeartRate = avgHeartRate,
+                avgHRV = avgHRV,
+                avgRestingHeartRate = avgRHR,
+                sleepDurationMinutes = sleepDuration,
+                deepSleepMinutes = sleepStageInfo.deepSleepMinutes,
+                lightSleepMinutes = sleepStageInfo.lightSleepMinutes,
+                remSleepMinutes = sleepStageInfo.remSleepMinutes,
+                awakeSleepMinutes = sleepStageInfo.awakeSleepMinutes
+            )
+
+            // 서버로 전송
+            RetrofitClient.apiService.syncHealthData(healthSyncRequest)
+            Log.d("HEALTH_SYNC", "서버 동기화 완료")
+
+        } catch (e: Exception) {
+            Log.e("HEALTH_SYNC", "서버 동기화 실패: ${e.message}", e)
+        }
     }
 }
