@@ -1,0 +1,6 @@
+수정사항 파일 올려용
+
+ActivityApi.kt, Analysis.kt 파일은 remote안에 api 라는 이름의 프로젝트? 폴더? 하나 더 추가해서 넣고
+ActivityDto.kt, AnalysisDto.kt 파일은 dto 파일에 넣으시면 됩니다.
+
+Activity = 활동, Analysis = 분석
