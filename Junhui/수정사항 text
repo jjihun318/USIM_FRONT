@@ -1,0 +1,12 @@
+수정사항 파일 올려용
+
+1. ActivityApi.kt, Analysis.kt 파일은 remote안에 api 라는 이름의 프로젝트? 폴더? 하나 더 추가해서 넣고
+2. ActivityDto.kt, AnalysisDto.kt 파일은 dto 파일에 넣으시면 됩니다.
+3. ApiClient.kt 부분 import 부분에
+
+import com.example.runnershigh.data.remote.api.ActivityApi
+import com.example.runnershigh.data.remote.api.AnalysisApi
+
+을 새로 추가했습니다.
+
+Activity = 활동, Analysis = 분석
