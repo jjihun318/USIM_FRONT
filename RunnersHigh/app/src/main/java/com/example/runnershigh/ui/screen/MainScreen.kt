@@ -31,7 +31,7 @@ fun MainScreen(onLoginClick: () -> Unit) {
         Text(
             text = "Runner's",
             color = Color.White,
-            fontSize = 96.sp,
+            fontSize = 80.sp,
             fontFamily = RacingSansOne,
             fontWeight = FontWeight.Normal,
             modifier = Modifier
@@ -43,12 +43,12 @@ fun MainScreen(onLoginClick: () -> Unit) {
         Text(
             text = "High.",
             color = Color.White,
-            fontSize = 96.sp,
+            fontSize = 80.sp,
             fontFamily = RacingSansOne,
             fontWeight = FontWeight.Normal,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .offset(x = (-16).dp, y = (-200).dp)  // ← 위로 올림
+                .offset(x = (-16).dp, y = (-150).dp)  // ← 위로 올림
         )
 
         // Login 화살표

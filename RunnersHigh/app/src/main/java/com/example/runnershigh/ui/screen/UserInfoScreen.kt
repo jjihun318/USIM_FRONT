@@ -24,11 +24,14 @@ import androidx.compose.ui.unit.sp
 import com.example.runnershigh.R
 import com.example.runnershigh.ui.theme.RacingSansOne
 import androidx.compose.material3.TextFieldDefaults
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.runnershigh.ui.AuthViewModel
 
 @Composable
 fun UserInfoScreen(
     onNextClick: (height: String, weight: String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: AuthViewModel = viewModel()
 ) {
     val (height, setHeight) = remember { mutableStateOf("") }
     val (weight, setWeight) = remember { mutableStateOf("") }
@@ -70,13 +73,16 @@ fun UserInfoScreen(
             // Height 입력창
             OutlinedTextField(
                 value = height,
-                onValueChange = setHeight,
+                onValueChange = {
+                    setHeight(it)
+                    // ✅ ViewModel 에도 저장해서 나중에 회원가입 API 때 같이 사용
+                    viewModel.onBodyHeightChange(it)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp),
                 placeholder = { Text("Cm") },
                 singleLine = true,
-
                 colors = TextFieldDefaults.colors(
                     focusedContainerColor = Color.White,
                     unfocusedContainerColor = Color.White,
@@ -106,7 +112,11 @@ fun UserInfoScreen(
             // Weight 입력창
             OutlinedTextField(
                 value = weight,
-                onValueChange = setWeight,
+                onValueChange = {
+                    setWeight(it)
+                    // ✅ ViewModel 에도 저장
+                    viewModel.onBodyWeightChange(it)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(64.dp),
@@ -130,6 +140,7 @@ fun UserInfoScreen(
             Button(
                 onClick = {
                     if (height.isNotBlank() && weight.isNotBlank()) {
+                        // ✅ 다음 화면으로 넘겨줄 콜백
                         onNextClick(height, weight)
                     }
                     // TODO: 필요하면 else 에서 Toast/다이얼로그로 "둘 다 입력해 주세요" 추가
@@ -171,7 +182,7 @@ fun UserInfoScreen(
                 // 오른쪽 아래 Runner's High.
                 Row(
                     modifier = Modifier
-                        .align(Alignment.BottomEnd)  // ⬅ Box 안 child에 align 적용 OK
+                        .align(Alignment.BottomEnd)
                         .padding(24.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.End

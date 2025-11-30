@@ -16,6 +16,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.runnershigh.ui.AuthViewModel
 import com.example.runnershigh.ui.theme.RacingSansOne
 
 @Composable
@@ -24,19 +26,28 @@ fun LoginScreen(
     onSignUpClick: () -> Unit,
     onForgotPasswordClick: () -> Unit,
     onLoginSuccess: () -> Unit,
-    onGoogleLoginClick: () -> Unit   //구글 로그인
-
+    onGoogleLoginClick: () -> Unit,   // 구글 로그인
+    viewModel: AuthViewModel = viewModel()
 ) {
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    val uiState by viewModel.loginUiState.collectAsState()
+    var localErrorMessage by remember { mutableStateOf<String?>(null) }
 
-    fun handleLogin() {
-        // TODO: 실제 로그인 로직 (Firebase 등 연결 예정)
-        // 현재는 바로 성공 콜백 호출
-        onLoginSuccess()
+    // 로그인 성공 시 네비게이션
+    LaunchedEffect(uiState.loginCompleted) {
+        if (uiState.loginCompleted) {
+            onLoginSuccess()
+            viewModel.consumeLoginCompletedFlag()
+        }
     }
 
-
+    fun handleLogin() {
+        if (uiState.email.isBlank() || uiState.password.isBlank()) {
+            localErrorMessage = "이메일과 비밀번호를 입력해주세요."
+            return
+        }
+        localErrorMessage = null
+        viewModel.login()
+    }
 
     Box(
         modifier = Modifier
@@ -99,8 +110,8 @@ fun LoginScreen(
                     color = Color(0xFF1E1E1E)
                 )
                 OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
+                    value = uiState.email,
+                    onValueChange = { viewModel.onLoginEmailChange(it) },
                     placeholder = { Text("") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
@@ -119,12 +130,28 @@ fun LoginScreen(
                     color = Color(0xFF1E1E1E)
                 )
                 OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
+                    value = uiState.password,
+                    onValueChange = { viewModel.onLoginPasswordChange(it) },
                     placeholder = { Text("") },
                     visualTransformation = PasswordVisualTransformation(),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
+                )
+            }
+
+            // 에러 메시지 (클라이언트 검증 + 서버/네트워크)
+            localErrorMessage?.let { msg ->
+                Text(
+                    text = msg,
+                    color = Color.Red,
+                    fontSize = 14.sp
+                )
+            }
+            uiState.errorMessage?.let { msg ->
+                Text(
+                    text = msg,
+                    color = Color.Red,
+                    fontSize = 14.sp
                 )
             }
 
@@ -134,13 +161,17 @@ fun LoginScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp),
+                enabled = !uiState.isLoading,
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF2C2C2C),
                     contentColor = Color(0xFFF5F5F5)
                 ),
                 shape = ButtonDefaults.shape
             ) {
-                Text(text = "Login", fontSize = 16.sp)
+                Text(
+                    text = if (uiState.isLoading) "Loading..." else "Login",
+                    fontSize = 16.sp
+                )
             }
 
             // 비밀번호 찾기
@@ -179,7 +210,7 @@ fun LoginScreen(
                 horizontalArrangement = Arrangement.Center
             ) {
                 OutlinedButton(
-                    onClick = { onGoogleLoginClick() },   // ← 내부에서 직접 처리 안 하고 콜백 호출
+                    onClick = { onGoogleLoginClick() },
                     modifier = Modifier
                         .width(96.dp)
                         .height(48.dp),

@@ -2,8 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("kotlin-parcelize")
     // Firebase용 Google Services 플러그인 실제 적용
-   id("com.google.gms.google-services")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -12,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.runnershigh"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -58,13 +59,29 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    implementation("androidx.health.connect:connect-client:1.1.0")
+    implementation("com.naver.maps:map-sdk:3.23.0")
+    implementation("androidx.cardview:cardview:1.0.0")
+    // ★ 위치 정보(Fused Location Provider)
+    implementation("com.google.android.gms:play-services-location:21.0.1")
     implementation("androidx.navigation:navigation-compose:2.7.7")  // ← 이 줄 추가
     // Firebase BOM (버전은 Firebase 문서에서 최신 값으로 교체)
-   implementation(platform("com.google.firebase:firebase-bom:33.0.0"))
+    implementation(platform("com.google.firebase:firebase-bom:33.0.0"))
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("androidx.compose.material:material-icons-extended")
-
+    implementation("com.squareup.moshi:moshi-kotlin:1.15.0")
     // Google 로그인용
     implementation("com.google.android.gms:play-services-auth:21.1.0")
+    // Retrofit
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("com.jakewharton.timber:timber:5.0.1")
 
+    // OkHttp 로깅 (선택이지만 있으면 디버깅 편함)
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.naver.maps:map-sdk:3.23.0")
+    implementation("com.google.android.gms:play-services-location:21.0.1")
 }

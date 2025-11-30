@@ -1,0 +1,27 @@
+package com.example.runnershigh.data.remote.dto
+
+import com.google.gson.annotations.SerializedName
+
+data class Mission(
+    @SerializedName("mission_name")
+    val missionName: String,
+
+    @SerializedName("mission_description")
+    val missionDescription: String,
+
+    @SerializedName("progress_status")
+    val progressStatus: String,
+
+    @SerializedName("exp_points")
+    val expPoints: Int,
+
+    @SerializedName("mission_category")
+    val missionCategory: String,
+
+    @SerializedName("gauge_ratio")
+    val gaugeRatio: Int   // 0~100 between percent
+)
+
+data class MissionListResponse(
+    val missions: List<Mission>
+)
