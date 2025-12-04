@@ -1,1 +1,7 @@
+코스 크리에이터 ui 올립니다
 
+build.gradle.kts(:app)에
+
+implementation("androidx.compose.material:material-icons-extended:1.5.4")
+
+코드 한 줄만 추가해주세요 (아이콘 때문에 추가해야하는 코드입니다)
