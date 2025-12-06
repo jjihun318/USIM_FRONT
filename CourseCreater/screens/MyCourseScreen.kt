@@ -19,10 +19,7 @@ import androidx.compose.ui.unit.sp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MyCourseScreen(
-    onBackClick: () -> Unit,
-    onAddCourseClick: () -> Unit
-) {
+fun MyCourseScreen(onBackClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -76,36 +73,6 @@ fun MyCourseScreen(
                 )
             }
         }
-
-        // 새 코스 추가하기 버튼
-        Button(
-            onClick = onAddCourseClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp)
-                .height(56.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color.White
-            ),
-            shape = RoundedCornerShape(12.dp),
-            border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF4A7C4E))
-        ) {
-            Icon(
-                imageVector = Icons.Default.Add,
-                contentDescription = null,
-                tint = Color(0xFF4A7C4E),
-                modifier = Modifier.size(24.dp)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(
-                text = "새 코스 추가하기",
-                color = Color(0xFF4A7C4E),
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-        }
-
-        Spacer(modifier = Modifier.height(24.dp))
 
         // 등록된 코스 헤더
         Row(

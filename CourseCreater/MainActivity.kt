@@ -47,8 +47,7 @@ class MainActivity : ComponentActivity() {
                             currentScreen = "main"
                         }
                         MyCourseScreen(
-                            onBackClick = { currentScreen = "main" },
-                            onAddCourseClick = { currentScreen = "addcourse" }
+                            onBackClick = { currentScreen = "main" }
                         )
                     }
                     "addcourse" -> {
