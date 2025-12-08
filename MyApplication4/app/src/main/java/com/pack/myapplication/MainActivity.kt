@@ -1,317 +1,418 @@
 package com.pack.myapplication
 
 import android.Manifest
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
-import com.naver.maps.map.util.MarkerIcons
-import com.naver.maps.map.overlay.Marker
+import android.annotation.SuppressLint
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
-import android.widget.TextView
-import android.view.View
 import android.view.LayoutInflater
+import android.view.View
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import com.google.android.gms.location.*
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.naver.maps.geometry.LatLng
-import com.naver.maps.map.CameraAnimation
 import com.naver.maps.map.CameraUpdate
 import com.naver.maps.map.LocationTrackingMode
 import com.naver.maps.map.MapView
 import com.naver.maps.map.NaverMap
 import com.naver.maps.map.OnMapReadyCallback
-import com.pack.myapplication.databinding.ActivityMainBinding
-import com.naver.maps.map.util.FusedLocationSource
-import android.app.AlertDialog
-import androidx.lifecycle.lifecycleScope
-import android.widget.Toast
-import android.os.Handler
-import android.os.Looper
-import android.location.LocationListener
-import android.location.LocationManager
 import com.naver.maps.map.overlay.PolylineOverlay
-// import com.pack.myapplication.api.RetrofitClient // ❌ Direction5 API 관련 import 제거
-// import kotlinx.coroutines.launch // ❌ Coroutine 관련 import 제거 (API 호출 제거로 불필요)
+import android.location.Location
+import com.naver.maps.map.CameraAnimation
+import kotlinx.coroutines.launch
+import java.util.UUID
+import java.util.concurrent.TimeUnit
+
+// ⭐ [추가/변경 1] RunDataUploader 및 관련 데이터 모델 임포트
+import com.pack.myapplication.data.RunDataUploader
+import com.pack.myapplication.RunRecordRequest // RunRecordRequest는 프로젝트 내에 정의되어 있어야 함
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
-    /*private lateinit var binding: ActivityMainBinding*/
     private lateinit var mapView: MapView
     private lateinit var naverMap: NaverMap
-    //!private lateinit var locationSource: FusedLocationSource
-    private lateinit var locationManager: LocationManager
-    private var currentMarker: com.naver.maps.map.overlay.Marker? = null
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
-    // 지도 준비 상태 플래그 추가
+    // ⭐ [추가/변경 2] RunDataUploader 인스턴스 선언
+    private val runDataUploader = RunDataUploader()
+
+    // UI 요소
+    private lateinit var fabStart: FloatingActionButton
+    private lateinit var fabStop: FloatingActionButton
+    private lateinit var fabPause: FloatingActionButton
+    private lateinit var tvDistance: TextView
+
+    // 상태 및 데이터
     private var isMapReady = false
-
-    // 경로 저장을 위한 리스트와 Polyline 변수
-    private val pathPoints = mutableListOf<LatLng>()
-    private var polyline: PolylineOverlay? = null
-
-
-
-    private var totalDistance = 0.0  //  Double 타입으로 변경: 총 이동 거리 (미터)
     private var isTracking = false
+    private var totalDistance = 0.0
+    private var lastLocation: LatLng? = null // 이전 위치 (거리 계산용)
+
+    // [변경 사항 1]: 러닝 시간 저장을 위한 변수 추가
+    private var startTimeMillis: Long = 0L // 추적 시작 시간 (밀리초)
+    private var totalTimeMillis: Long = 0L // 최종 러닝 시간 (밀리초)
+
+    // 러닝 경로 기록용
+    private val pathPoints = mutableListOf<LatLng>() // 지도 Polyline용
+    private val runningTrackPoints = mutableListOf<LocationPoint>() // GPX 기록용 (고도, 시간 포함)
+    private var currentRunPolyline: PolylineOverlay? = null // 현재 러닝 경로 (녹색)
 
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1000
+        private const val TAG = "MainActivity"
+
+        // 5초 간격으로 위치 업데이트 요청
+        private val LOCATION_REQUEST_INTERVAL = TimeUnit.SECONDS.toMillis(5)
     }
 
-    // locationListener를 클래스 멤버로 완성하여 스코프 문제 해결
-    private val locationListener = object : LocationListener {
-        override fun onLocationChanged(location: android.location.Location) {
-            if (!isTracking) return // 추적이 중지된 상태면 업데이트 무시
-
-            val latitude = location.latitude
-            val longitude = location.longitude
-            val currentLatLng = LatLng(latitude, longitude)
-
-            // Polyline 업데이트를 위해 새로운 위치를 추가하기 전에 거리 계산을 수행
-            if (pathPoints.size >= 1) {
-                // 직전 위치를 가져와서 새로운 위치까지의 거리를 계산합니다.
-                val previousPoint = pathPoints.last()
-                calculateDistance(previousPoint, currentLatLng) // ⭐ GPS 기반 거리 계산 함수 호출
-            }
-
-            // 이동 경로 기록
-            pathPoints.add(currentLatLng)
-
-            // Polyline 업데이트 (경로 점이 2개 이상일 때)
-            if (pathPoints.size >= 2) {
-                polyline?.coords = pathPoints // Polyline 업데이트
-            }
-
-            // 지도 중심을 새 위치로 업데이트
-            val cameraUpdate = CameraUpdate.scrollTo(currentLatLng)
-            naverMap.moveCamera(cameraUpdate)
-
-            // 마커 업데이트 (기존 마커 제거 후 새 마커 추가)
-            currentMarker?.map = null
-            currentMarker = com.naver.maps.map.overlay.Marker().apply {
-                position = currentLatLng
-                map = naverMap
-                captionText = "현재 위치"
-                icon = MarkerIcons.GREEN // 추적 중 마커 색상 변경
-            }
-        }
-
-        override fun onProviderEnabled(provider: String) {}
-        override fun onProviderDisabled(provider: String) {}
-        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+    // 위치 업데이트 요청 객체
+    private val locationRequest: LocationRequest = LocationRequest.create().apply {
+        interval = LOCATION_REQUEST_INTERVAL
+        fastestInterval = LOCATION_REQUEST_INTERVAL / 2
+        priority = Priority.PRIORITY_HIGH_ACCURACY
     }
 
-    // --- Distance Calculation ---
+    // 위치 콜백 (FusedLocationProviderClient 기반의 핵심 추적 로직)
+    private val locationCallback = object : LocationCallback() {
+        override fun onLocationResult(locationResult: LocationResult) {
+            locationResult.lastLocation?.let { location ->
+                val currentLatLng = LatLng(location.latitude, location.longitude)
 
-    /**
-     * ⭐ GPS 기반 거리 계산 함수로 변경 (Direction5 API 호출 제거)
-     * NaverMap SDK의 `LatLng.distance(to: LatLng)`를 사용하여 두 지점 간의 거리를 미터(m) 단위로 계산합니다.
-     */
-    private fun calculateDistance(from: LatLng, to: LatLng) {
-        // NaverMap SDK에서 제공하는 두 좌표 간의 거리 계산 함수 사용 (단위: 미터)
-        val distanceMeters = from.distanceTo(to)
+                // 1. 지도 위치 업데이트 (Naver Location Overlay)
+                naverMap.locationOverlay.run {
+                    isVisible = true
+                    position = currentLatLng
+                }
 
-        // 총 거리에 누적
-        totalDistance += distanceMeters
+                // 추적 중일 때만 경로 및 거리 계산
+                if (isTracking) {
+                    // 2. 러닝 경로 기록 및 거리 계산
+                    updateRunTrackingData(currentLatLng, location)
+                }
 
-        // UI 업데이트
-        updateDistanceUI(totalDistance)
-    }
-
-    private fun updateDistanceUI(distance: Double) { //  Double 타입으로 변경
-        runOnUiThread {
-            val distanceKm = distance / 1000.0 // 미터를 킬로미터로 변환
-            val distanceText = String.format("%.2f km", distanceKm)
-
-            findViewById<TextView>(R.id.tvDistance)?.let { textView ->
-                textView.text = distanceText //실시간 업데이트 담당
-            } ?: run {
-                Log.e("DistanceUI", "tvDistance TextView를 찾을 수 없습니다!")
+                // 5. 마지막 위치 업데이트 (거리 계산용)
+                lastLocation = currentLatLng
             }
         }
     }
-
-    // --- Activity Lifecycle ---
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
-
-        window.statusBarColor = Color.parseColor("#CCFF00")
-
         mapView = findViewById(R.id.mapView)
         mapView.onCreate(savedInstanceState)
         mapView.getMapAsync(this)
+
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
 
+        // UI 요소 초기화 및 리스너 설정
+        fabStart = findViewById(R.id.fabStart)
+        fabStop = findViewById(R.id.fabStop)
+        fabPause = findViewById(R.id.fabPause)
+        tvDistance = findViewById(R.id.tvDistance)
 
-        // 버튼 클릭 리스너
-        findViewById<FloatingActionButton>(R.id.fabPause).setOnClickListener {
-            // 일시정지 로직
-            Toast.makeText(this, "일시정지는 구현되지 않았습니다.", Toast.LENGTH_SHORT).show()
-        }
+        setupButtonListeners()
+        updateUIState(false) // 초기 상태: 시작 버튼만 보임
 
-        findViewById<FloatingActionButton>(R.id.fabStop).setOnClickListener {
-            stopTracking()
-        }
-
-        findViewById<FloatingActionButton>(R.id.fabStart).setOnClickListener {
-            if (!isMapReady) {
-                Toast.makeText(this, "지도를 초기화하는 중입니다. 잠시 후 다시 시도해주세요.", Toast.LENGTH_LONG).show()
-                return@setOnClickListener
-            }
-
-            showCountdownDialog()
-
-            // UI 변경은 바로 적용
-            findViewById<FloatingActionButton>(R.id.fabStart).visibility = View.INVISIBLE
-            findViewById<FloatingActionButton>(R.id.fabStop).visibility = View.VISIBLE
-            findViewById<FloatingActionButton>(R.id.fabPause).visibility = View.VISIBLE
-        }
+        // 권한 확인 및 위치 추적 시작 준비
+        checkLocationPermission()
     }
 
-    // --- Tracking Control Functions ---
+    override fun onMapReady(naverMap: NaverMap) {
+        this.naverMap = naverMap
+        isMapReady = true
 
-    private fun prepareAndStartTracking() {
-        // 이전 Polyline이 남아있다면 제거 (안전장치)
-        polyline?.map = null
-        polyline = null
-        pathPoints.clear()
-
-        // 거리 측정 초기화
-        totalDistance = 0.0 //  Double 타입으로 초기화
-        isTracking = true
-
-        polyline = PolylineOverlay().apply {
-            color = Color.GREEN
-            width = 20
-            this.map = naverMap // naverMap 접근 시점 안전 확보
-        }
-
-        startLocationUpdates()
-        updateDistanceUI(0.0) //  Double 타입으로 초기 UI 업데이트
-    }
-
-    private fun stopTracking() {
-        // 정지 로직
-        findViewById<FloatingActionButton>(R.id.fabStart).visibility = View.VISIBLE
-        findViewById<FloatingActionButton>(R.id.fabStop).visibility = View.INVISIBLE
-        findViewById<FloatingActionButton>(R.id.fabPause).visibility = View.INVISIBLE
-        isTracking = false
-
-        // 1. 위치 추적 중지
-        try {
-            locationManager.removeUpdates(locationListener)
-        } catch (e: Exception) {
-            Log.e("StopError", "위치 업데이트 중지 중 오류: ${e.message}")
-        }
-        // 핵심 수정: 거리 UI를 0.00 km로 업데이트
-        updateDistanceUI(0.0)
-        // Polyline 제거
-        polyline?.map = null
-        polyline = null
-
-        // 경로 데이터 초기화
-        pathPoints.clear()
-
-        // 현재 마커 제거 및 위치 재설정
-        currentMarker?.map = null
-        currentMarker = null
-        getCurrentLocation()//현재 위치로 시점 이동
-
-        Toast.makeText(this, "경로 추적을 중지합니다.", Toast.LENGTH_SHORT).show()
-    }
-
-    // --- Map and Location Setup ---
-
-    override fun onMapReady(map: NaverMap) {
-        naverMap = map
-        isMapReady = true // 지도 준비 완료 플래그 설정
-
-        // 지도 UI 설정
         naverMap.uiSettings.isZoomControlEnabled = true
         naverMap.uiSettings.isLocationButtonEnabled = true
         naverMap.locationTrackingMode = LocationTrackingMode.Follow
+        checkLocationPermissionAndMoveCamera()
+        naverMap.locationOverlay.run {
+            anchor = android.graphics.PointF(0.5f, 0.5f)
+        }
+    }
 
-        // 권한 확인 및 현재 위치 가져오기
+    private fun checkLocationPermissionAndMoveCamera() {
         if (ContextCompat.checkSelfPermission(
                 this,
                 Manifest.permission.ACCESS_FINE_LOCATION
             ) == PackageManager.PERMISSION_GRANTED
         ) {
-            getCurrentLocation()
+            moveCameraToCurrentLocation()
         } else {
+            requestLocationPermission()
+        }
+    }
+
+    private fun moveCameraToCurrentLocation() {
+        try {
+            fusedLocationClient.lastLocation
+                .addOnSuccessListener { location: Location? ->
+                    if (location != null) {
+                        val currentLatLng = LatLng(location.latitude, location.longitude)
+
+                        val cameraUpdate =
+                            CameraUpdate.scrollTo(currentLatLng).animate(CameraAnimation.Easing)
+                        naverMap.moveCamera(cameraUpdate)
+
+                        naverMap.locationOverlay.apply {
+                            isVisible = true
+                            position = currentLatLng
+                            bearing = location.bearing
+                        }
+                    } else {
+                        Log.w("Location", "마지막 위치 정보를 가져올 수 없습니다. 임시 위치 유지.")
+                    }
+                }
+        } catch (e: SecurityException) {
+            Log.e("Location", "위치 정보를 가져오는 중 보안 예외 발생", e)
+        }
+    }
+
+    private fun requestLocationPermission() {
+        ActivityCompat.requestPermissions(
+            this,
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+            LOCATION_PERMISSION_REQUEST_CODE
+        )
+    }
+
+    private fun setupButtonListeners() {
+        fabPause.setOnClickListener {
+            Toast.makeText(this, "일시정지는 구현되지 않았습니다.", Toast.LENGTH_SHORT).show()
+        }
+
+        fabStop.setOnClickListener {
+            stopTracking()
+        }
+
+        fabStart.setOnClickListener {
+            if (!isMapReady) {
+                Toast.makeText(this, "지도를 초기화하는 중입니다. 잠시 후 다시 시도해주세요.", Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
+            showCountdownDialog()
+        }
+    }
+
+    /**
+     * 위치 권한 확인 및 요청
+     */
+    private fun checkLocationPermission() {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
                 LOCATION_PERMISSION_REQUEST_CODE
             )
+        } else {
+            // 권한이 있으면 위치 업데이트 리스너는 바로 등록 (지도 오버레이용)
+            startLocationUpdates(false)
         }
-
-        // 카메라 위치 설정 (서울 시청 기준)
-        setDefaultLocation()
     }
 
-    private fun getCurrentLocation() {
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-
-        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-            if (location != null) {
-                val currentLatLng = LatLng(location.latitude, location.longitude)
-
-                // 지도 중심을 현재 위치로 설정
-                val cameraUpdate = CameraUpdate.scrollTo(currentLatLng)
-                naverMap.moveCamera(cameraUpdate)
-
-                currentMarker?.map = null // 기존 마커 제거
-                currentMarker = com.naver.maps.map.overlay.Marker().apply {
-                    position = currentLatLng
-                    map = naverMap
-                    icon = MarkerIcons.BLUE
-                    captionText = "현재 위치"
-                }
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                startLocationUpdates(false) // 권한 획득 후 즉시 위치 업데이트 시작
             } else {
-                setDefaultLocation()
+                Toast.makeText(this, "위치 권한이 거부되었습니다.", Toast.LENGTH_LONG).show()
             }
         }
     }
 
-    private fun startLocationUpdates() {
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            Toast.makeText(this, "위치 권한이 없어 추적을 시작할 수 없습니다.", Toast.LENGTH_LONG).show()
-            return
-        }
-
-        // 위치 업데이트 설정 (GPS_PROVIDER 사용)
-        locationManager.requestLocationUpdates(
-            LocationManager.GPS_PROVIDER,
-            1000,  // 1초마다
-            0f,    // 0m 이상 이동 시
-            locationListener // 클래스 멤버 locationListener 사용
+    /**
+     * 위치 업데이트 요청 시작
+     * @param isForTracking true일 경우에만 isTracking 상태를 true로 설정하고 토스트 메시지 표시
+     */
+    @SuppressLint("MissingPermission")
+    private fun startLocationUpdates(isForTracking: Boolean) {
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest,
+            locationCallback,
+            Looper.getMainLooper()
         )
-        Toast.makeText(this, "경로 추적을 시작합니다.", Toast.LENGTH_SHORT).show()
+        if (isForTracking) {
+            isTracking = true
+            Toast.makeText(this, "경로 추적을 시작합니다.", Toast.LENGTH_SHORT).show()
+        }
     }
 
-    private fun setDefaultLocation() {
-        val seoulCity = LatLng(37.5665, 126.9780)
-        val cameraUpdate = CameraUpdate.scrollTo(seoulCity)
-        naverMap.moveCamera(cameraUpdate)
+    /**
+     * 위치 업데이트 중지
+     */
+    private fun stopLocationUpdates() {
+        fusedLocationClient.removeLocationUpdates(locationCallback)
+    }
+
+    // --- 러닝 추적 로직 ---
+
+    /**
+     * 러닝 경로 기록 및 거리 계산 로직
+     */
+    private fun updateRunTrackingData(currentLatLng: LatLng, location: Location) {
+        // 1. 거리 계산
+        lastLocation?.let { last ->
+            val distance = last.distanceTo(currentLatLng)
+            totalDistance += distance
+            updateDistanceUI(totalDistance)
+        }
+
+        // 2. 경로 기록 (Polyline용)
+        pathPoints.add(currentLatLng)
+        if (pathPoints.size >= 2) {
+            currentRunPolyline?.coords = pathPoints
+        }
+
+        // 3. GPX 기록용 데이터 추가
+        val point = LocationPoint(
+            latitude = currentLatLng.latitude,
+            longitude = currentLatLng.longitude,
+            elevation = location.altitude,
+            time = GpxManager.getIso8601Time(location.time)
+        )
+        runningTrackPoints.add(point)
+    }
+
+    // --- UI 및 상태 관리 ---
+
+    private fun updateDistanceUI(distance: Double) {
+        runOnUiThread {
+            val distanceKm = distance / 1000.0
+            val distanceText = String.format("%.2f km", distanceKm)
+            tvDistance.text = distanceText
+        }
+    }
+
+    private fun updateUIState(tracking: Boolean) {
+        if (tracking) {
+            fabStart.visibility = View.INVISIBLE
+            fabStop.visibility = View.VISIBLE
+            fabPause.visibility = View.VISIBLE
+        } else {
+            fabStart.visibility = View.VISIBLE
+            fabStop.visibility = View.INVISIBLE
+            fabPause.visibility = View.INVISIBLE
+        }
+    }
+
+    private fun prepareAndStartTracking() {
+        // 이전 데이터 초기화
+        currentRunPolyline?.map = null
+        currentRunPolyline = null
+        pathPoints.clear()
+        runningTrackPoints.clear()
+        totalDistance = 0.0
+        lastLocation = null
+
+        // [변경 사항 2]: 러닝 시간 초기화 및 시작 시간 기록
+        totalTimeMillis = 0L
+        startTimeMillis = System.currentTimeMillis()
+
+        // 새로운 현재 러닝 경로 Polyline (녹색) 생성
+        currentRunPolyline = PolylineOverlay().apply {
+            color = Color.GREEN
+            width = 20
+            this.map = naverMap
+        }
+
+        updateDistanceUI(0.0)
+        updateUIState(true) // UI 상태 변경 (시작 -> 중지/일시정지)
+        startLocationUpdates(true) // 추적 상태로 위치 업데이트 시작
+    }
+
+    private fun stopTracking() {
+        if (!isTracking) return
+
+        isTracking = false
+        updateUIState(false) // UI 상태 변경 (중지 -> 시작)
+
+        // 1. 경로 저장 및 코스 표시
+        if (pathPoints.isNotEmpty()) {
+            // [변경 사항 3-A]: 총 러닝 시간 계산 및 totalTimeMillis에 저장
+            val endTimeMillis = System.currentTimeMillis()
+            totalTimeMillis = endTimeMillis - startTimeMillis
+            startTimeMillis = 0L // 시작 시간 초기화
+
+            // C. GPX 생성 및 백엔드 전송 호출
+            // [변경 사항 3-B]: sendGpxDataToServer 함수에 totalTimeMillis 전달
+            sendGpxDataToServer(runningTrackPoints, totalDistance, totalTimeMillis)
+
+            // [추가 로그]: 최종 거리 및 시간 확인 로그
+            val distanceKm = totalDistance / 1000.0
+            val timeSec = totalTimeMillis / 1000.0
+            Log.d(TAG, "최종 거리: ${String.format("%.2f", distanceKm)} km, 최종 시간: ${String.format("%.1f", timeSec)} 초")
+        } else {
+            Toast.makeText(this, "기록된 위치 데이터가 없어 저장하지 않습니다.", Toast.LENGTH_SHORT).show()
+        }
+
+        // 2. 현재 러닝 데이터 및 UI 초기화
+        updateDistanceUI(0.0)
+        currentRunPolyline?.map = null // 현재 러닝 경로 (녹색) 제거
+        currentRunPolyline = null
+
+        // 3. 마커 제거 및 위치 초기화
+        naverMap.locationOverlay.isVisible = false
+        lastLocation = null // 다음 러닝을 위해 마지막 위치 초기화
+
+        Toast.makeText(this, "경로 추적을 중지합니다.", Toast.LENGTH_SHORT).show()
+    }
+
+    /**
+     * GPX 데이터를 생성하고 Base64로 인코딩하여 백엔드로 전송합니다.
+     */
+    private fun sendGpxDataToServer(points: List<LocationPoint>, distance: Double, timeMillis: Long) {
+        lifecycleScope.launch {
+            try {
+                val gpxXmlContent = GpxManager.createGpxXmlString(points)
+                val base64GpxString = GpxManager.encodeToBase64(gpxXmlContent)
+
+                // ⭐ RunRecordRequest 생성 (요청된 임시 값 반영)
+                val runUploadRequest = RunRecordRequest(
+                    userId = "123", // 요청된 userId: 123
+                    name="강정보", // 요청된 name: 강정보
+                    distanceMeters = distance,
+                    totalTimeMillis = timeMillis, // 최종 러닝 시간 (밀리초)
+                    gpxFileBase64 = base64GpxString
+                )
+
+                // ⭐ Uploader를 통해 서버로 데이터 전송
+                val uploadSuccess = runDataUploader.uploadRunData(runUploadRequest)
+
+                if (uploadSuccess) {
+                    Log.d(TAG, "✅ 러닝 데이터 서버 전송 성공.")
+                    Toast.makeText(this@MainActivity, "러닝 기록 서버 전송 완료.", Toast.LENGTH_LONG).show()
+                } else {
+                    Log.e(TAG, "❌ 러닝 데이터 서버 전송 실패.")
+                    Toast.makeText(this@MainActivity, "러닝 기록 서버 전송 실패.", Toast.LENGTH_LONG).show()
+                }
+
+                Log.d(TAG, "GPX 데이터 생성 및 Base64 인코딩 완료. (총 거리: $distance m, 총 시간: ${timeMillis / 1000}초)")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "GPX 생성 또는 전송 중 오류 발생", e)
+                Toast.makeText(this@MainActivity, "데이터 전송 중 오류 발생: ${e.message}", Toast.LENGTH_LONG)
+                    .show()
+            }
+        }
     }
 
     // --- Countdown Dialog ---
@@ -341,7 +442,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
                     countdownText.text = "GO!"
                     timer.postDelayed({
                         dialog.dismiss()
-                        onCountdownFinished() // 카운트다운 완료 후 추적 시작
+                        onCountdownFinished()
                     }, 500)
                 }
             }
@@ -350,32 +451,16 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun onCountdownFinished() {
-        // 카운트다운이 끝났을 때 실행되는 로직.
-        prepareAndStartTracking() // 여기서 실제 추적을 시작합니다.
+        prepareAndStartTracking()
     }
 
-
-    // --- System Overrides ---
-
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-
-        if (requestCode == LOCATION_PERMISSION_REQUEST_CODE) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                getCurrentLocation()
-            } else {
-                setDefaultLocation()
-            }
-        }
-    }
+    // --- Lifecycle Overrides ---
 
     override fun onStart() {
         super.onStart()
         mapView.onStart()
+        // 앱이 포그라운드로 돌아오면 위치 업데이트 재개
+        startLocationUpdates(false)
     }
 
     override fun onResume() {
@@ -391,21 +476,22 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onStop() {
         super.onStop()
         mapView.onStop()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        mapView.onDestroy()
-        locationManager.removeUpdates(locationListener)
-    }
-
-    override fun onSaveInstanceState(outState: Bundle) {
-        super.onSaveInstanceState(outState)
-        mapView.onSaveInstanceState(outState)
+        // 앱이 배경으로 갈 때 위치 업데이트 중지
+        stopLocationUpdates()
     }
 
     override fun onLowMemory() {
         super.onLowMemory()
         mapView.onLowMemory()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        mapView.onDestroy()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        mapView.onSaveInstanceState(outState)
     }
 }
