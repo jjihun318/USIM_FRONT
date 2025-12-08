@@ -19,12 +19,12 @@ data class CourseData(
     val name: String,
 
     // ✨ 핵심 통계: 거리 (미터)
-    @SerializedName("distanceMeters")
+   /* @SerializedName("distanceMeters")
     val distanceMeters: Double,
 
     // ✨ 핵심 통계: 총 시간 (밀리초)
     @SerializedName("totalTimeMillis")
-    val totalTimeMillis: Long,
+    val totalTimeMillis: Long,*/
 
     // 러닝 경로의 개별 지점 리스트
     @SerializedName("pathPoints")
