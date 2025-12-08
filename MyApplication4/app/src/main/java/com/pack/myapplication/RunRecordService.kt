@@ -3,7 +3,7 @@ package com.pack.myapplication
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
-
+import retrofit2.http.GET // GET 임포트 추가
 /**
  * 러닝 기록 관련 서버 API 통신을 위한 Retrofit 인터페이스
  */
@@ -19,4 +19,7 @@ interface RunRecordService {
     suspend fun uploadRunRecord(
         @Body request: RunRecordRequest
     ): Response<RunRecordResult>
+    // ⭐ [추가된 기능] 코스 목록을 서버 API에 HTTP GET 요청으로 가져옵니다.
+    @GET("api/v1/courses/list") // 코스 목록 GET 엔드포인트 (가정)
+    suspend fun getCourseList(): Response<CourseListResult>
 }

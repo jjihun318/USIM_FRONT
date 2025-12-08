@@ -29,12 +29,8 @@ import com.naver.maps.map.overlay.PolylineOverlay
 import android.location.Location
 import com.naver.maps.map.CameraAnimation
 import kotlinx.coroutines.launch
-import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-// ⭐ [추가/변경 1] RunDataUploader 및 관련 데이터 모델 임포트
-import com.pack.myapplication.data.RunDataUploader
-import com.pack.myapplication.RunRecordRequest // RunRecordRequest는 프로젝트 내에 정의되어 있어야 함
 
 class MainActivity : AppCompatActivity(), OnMapReadyCallback {
 
@@ -42,7 +38,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var naverMap: NaverMap
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
-    // ⭐ [추가/변경 2] RunDataUploader 인스턴스 선언
+    // RunDataUploader 인스턴스 선언
     private val runDataUploader = RunDataUploader()
 
     // UI 요소
@@ -57,7 +53,6 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private var totalDistance = 0.0
     private var lastLocation: LatLng? = null // 이전 위치 (거리 계산용)
 
-    // [변경 사항 1]: 러닝 시간 저장을 위한 변수 추가
     private var startTimeMillis: Long = 0L // 추적 시작 시간 (밀리초)
     private var totalTimeMillis: Long = 0L // 최종 러닝 시간 (밀리초)
 
@@ -65,6 +60,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private val pathPoints = mutableListOf<LatLng>() // 지도 Polyline용
     private val runningTrackPoints = mutableListOf<LocationPoint>() // GPX 기록용 (고도, 시간 포함)
     private var currentRunPolyline: PolylineOverlay? = null // 현재 러닝 경로 (녹색)
+    private val coursePolylines = mutableListOf<PolylineOverlay>() // 코스 목록 Polyline (파란색)
 
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1000
@@ -139,7 +135,79 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         naverMap.locationOverlay.run {
             anchor = android.graphics.PointF(0.5f, 0.5f)
         }
+
+        // ⭐ 지도 준비 완료 시 서버 코스 목록을 불러와 그립니다.
+        loadAndDrawCourseRecords()
     }
+
+    // --- 코스 목록 다운로드 및 지도 표시 로직 ---
+
+    /**
+     * 서버에서 코스 목록을 불러와 지도에 Polyline으로 그립니다.
+     */
+    private fun loadAndDrawCourseRecords() {
+        // 기존에 그려진 코스를 제거하여 중복 생성을 방지합니다.
+        clearCoursePolylines()
+
+        lifecycleScope.launch {
+            Toast.makeText(this@MainActivity, "코스 목록을 불러오는 중...", Toast.LENGTH_SHORT).show()
+            val courseList = runDataUploader.getCourseRecords()
+
+            if (courseList != null) {
+                if (courseList.isNotEmpty()) {
+                    for (course in courseList) {
+                        drawCoursePolyline(course)
+                    }
+                    Toast.makeText(this@MainActivity, "${courseList.size}개의 코스가 지도에 표시되었습니다.", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(this@MainActivity, "서버에 저장된 코스가 없습니다.", Toast.LENGTH_LONG).show()
+                }
+            } else {
+                Toast.makeText(this@MainActivity, "코스 목록 불러오기 실패", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    /**
+     * 개별 코스 데이터를 받아 지도에 파란색 Polyline으로 그립니다.
+     */
+    private fun drawCoursePolyline(courseData: CourseData) {
+        // 1. LocationPoint 리스트를 LatLng 리스트로 변환
+        // 필드 이름 수정: courseData.points -> courseData.pathPoints
+        val latLngList = courseData.pathPoints.map { point ->
+            LatLng(point.latitude, point.longitude)
+        }
+
+        // 2. 리스트 크기 접근 수정: latLngList.size -> latLngList.size
+        if (latLngList.size < 2) {
+            // 3. courseId 필드를 사용하려면 CourseData에 정의되어 있어야 함
+            Log.w(TAG, "경로 지점 수가 부족하여 코스를 그릴 수 없습니다. (ID: ${courseData.courseId})")
+            return
+        }
+
+        // 2. 새로운 PolylineOverlay 객체 생성
+        val coursePolyline = PolylineOverlay().apply {
+            coords = latLngList
+            color = Color.BLUE // 코스는 파란색으로 표시
+            width = 15
+            map = naverMap // 지도에 추가
+        }
+
+        // 3. 관리 리스트에 추가 (나중에 제거/관리용)
+        coursePolylines.add(coursePolyline)
+
+        Log.d(TAG, "코스 #${courseData.courseId} (${courseData.name}) 지도에 파란색으로 그려짐.")
+    }
+
+    /**
+     * 지도에 표시된 모든 코스 Polyline을 제거합니다.
+     */
+    private fun clearCoursePolylines() {
+        coursePolylines.forEach { it.map = null }
+        coursePolylines.clear()
+    }
+
+    // --- 기본 지도/위치 로직 ---
 
     private fun checkLocationPermissionAndMoveCamera() {
         if (ContextCompat.checkSelfPermission(
@@ -271,7 +339,17 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun updateRunTrackingData(currentLatLng: LatLng, location: Location) {
         // 1. 거리 계산
         lastLocation?.let { last ->
-            val distance = last.distanceTo(currentLatLng)
+            // Android Location distanceTo 사용 (미터 단위 반환)
+            val locationA = Location("last").apply {
+                latitude = last.latitude
+                longitude = last.longitude
+            }
+            val locationB = Location("current").apply {
+                latitude = currentLatLng.latitude
+                longitude = currentLatLng.longitude
+            }
+
+            val distance = locationA.distanceTo(locationB).toDouble()
             totalDistance += distance
             updateDistanceUI(totalDistance)
         }
@@ -323,7 +401,7 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         totalDistance = 0.0
         lastLocation = null
 
-        // [변경 사항 2]: 러닝 시간 초기화 및 시작 시간 기록
+        // 러닝 시간 초기화 및 시작 시간 기록
         totalTimeMillis = 0L
         startTimeMillis = System.currentTimeMillis()
 
@@ -343,20 +421,20 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         if (!isTracking) return
 
         isTracking = false
+        stopLocationUpdates() // 위치 업데이트 중지
         updateUIState(false) // UI 상태 변경 (중지 -> 시작)
 
         // 1. 경로 저장 및 코스 표시
         if (pathPoints.isNotEmpty()) {
-            // [변경 사항 3-A]: 총 러닝 시간 계산 및 totalTimeMillis에 저장
+            // 총 러닝 시간 계산 및 totalTimeMillis에 저장
             val endTimeMillis = System.currentTimeMillis()
             totalTimeMillis = endTimeMillis - startTimeMillis
             startTimeMillis = 0L // 시작 시간 초기화
 
-            // C. GPX 생성 및 백엔드 전송 호출
-            // [변경 사항 3-B]: sendGpxDataToServer 함수에 totalTimeMillis 전달
+            // GPX 생성 및 백엔드 전송 호출
             sendGpxDataToServer(runningTrackPoints, totalDistance, totalTimeMillis)
 
-            // [추가 로그]: 최종 거리 및 시간 확인 로그
+            // 최종 거리 및 시간 확인 로그
             val distanceKm = totalDistance / 1000.0
             val timeSec = totalTimeMillis / 1000.0
             Log.d(TAG, "최종 거리: ${String.format("%.2f", distanceKm)} km, 최종 시간: ${String.format("%.1f", timeSec)} 초")
@@ -382,26 +460,28 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun sendGpxDataToServer(points: List<LocationPoint>, distance: Double, timeMillis: Long) {
         lifecycleScope.launch {
             try {
+                // GpxManager를 통해 GPX XML 콘텐츠 생성
                 val gpxXmlContent = GpxManager.createGpxXmlString(points)
+                // GpxManager를 통해 Base64 인코딩
                 val base64GpxString = GpxManager.encodeToBase64(gpxXmlContent)
 
-                // ⭐ RunRecordRequest 생성 (요청된 임시 값 반영)
+                // RunRecordRequest 생성
                 val runUploadRequest = RunRecordRequest(
-                    userId = "123", // 요청된 userId: 123
-                    name="강정보", // 요청된 name: 강정보
+                    userId = "123",
+                    name="강정보",
                     distanceMeters = distance,
                     totalTimeMillis = timeMillis, // 최종 러닝 시간 (밀리초)
                     gpxFileBase64 = base64GpxString
                 )
 
-                // ⭐ Uploader를 통해 서버로 데이터 전송
+                // Uploader를 통해 서버로 데이터 전송
                 val uploadSuccess = runDataUploader.uploadRunData(runUploadRequest)
 
                 if (uploadSuccess) {
                     Log.d(TAG, "✅ 러닝 데이터 서버 전송 성공.")
                     Toast.makeText(this@MainActivity, "러닝 기록 서버 전송 완료.", Toast.LENGTH_LONG).show()
                 } else {
-                    Log.e(TAG, "❌ 러닝 데이터 서버 전송 실패.")
+                    Log.e(TAG, "❌ 러닝 데이터 서버 전송 실패. (응답 오류)")
                     Toast.makeText(this@MainActivity, "러닝 기록 서버 전송 실패.", Toast.LENGTH_LONG).show()
                 }
 
@@ -460,7 +540,9 @@ class MainActivity : AppCompatActivity(), OnMapReadyCallback {
         super.onStart()
         mapView.onStart()
         // 앱이 포그라운드로 돌아오면 위치 업데이트 재개
-        startLocationUpdates(false)
+        if (!isTracking) {
+            startLocationUpdates(false)
+        }
     }
 
     override fun onResume() {
