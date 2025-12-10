@@ -1,5 +1,6 @@
 package com.example.runnershigh.ui.screen
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -44,7 +45,8 @@ import com.example.runnershigh.ui.theme.RacingSansOne
 fun RunningFeedbackScreen(
     onBack: () -> Unit,
     onSubmit: (RunningFeedback) -> Unit = {},
-    previousFeedback: List<SubmittedFeedback> = emptyList()
+    previousFeedback: List<SubmittedFeedback> = emptyList(),
+    onCreateCourseClick: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
     val green = Color(0xFF73F212)
@@ -284,6 +286,27 @@ fun RunningFeedbackScreen(
             )
 
             Spacer(modifier = Modifier.height(32.dp))
+
+            Button(
+                onClick = onCreateCourseClick,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color.White,
+                    contentColor = green
+                ),
+                border = BorderStroke(1.dp, green),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(52.dp),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Text(
+                    text = "새 코스 생성",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
 
             // ---------- 제출 버튼 ----------
             Box(

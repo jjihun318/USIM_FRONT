@@ -176,9 +176,29 @@ fun AppNavGraph(
         }
 
         composable("course/my") {
+            val userUuid = authViewModel.userUuid ?: ""
+            val courses by runningViewModel.userCourses.collectAsState()
+            val isLoading by runningViewModel.coursesLoading.collectAsState()
+            val courseError by runningViewModel.courseError.collectAsState()
+
+            LaunchedEffect(userUuid) {
+                if (userUuid.isNotBlank()) {
+                    runningViewModel.loadUserCourses(userUuid)
+                }
+            }
+
             MyCourseScreen(
                 onBackClick = { navController.popBackStack() },
-                onRegisterFromRecentClick = { navController.navigate("course/my/register_recent") }
+                onRegisterFromRecentClick = { navController.navigate("course/my/register_recent") },
+                courses = courses,
+                isLoading = isLoading,
+                errorMessage = courseError,
+                onCourseSelect = { course ->
+                    runningViewModel.selectCourse(course)
+                    navController.navigate("running") {
+                        popUpTo("running") { inclusive = false }
+                    }
+                }
             )
         }
 
@@ -206,13 +226,21 @@ fun AppNavGraph(
                 ?: ""
             val time = navController.previousBackStackEntry?.savedStateHandle?.get<String>("selectedTime")
                 ?: ""
+            val userUuid = authViewModel.userUuid ?: ""
 
             RegisterCourseScreen(
                 date = date,
                 location = location,
                 distance = distance,
                 time = time,
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                runningViewModel = runningViewModel,
+                userUuid = userUuid,
+                onRegisterSuccess = {
+                    navController.navigate("course/my") {
+                        popUpTo("course/register_form") { inclusive = true }
+                    }
+                }
             )
         }
 
@@ -287,7 +315,10 @@ fun AppNavGraph(
                     runningViewModel.submitFeedback(userUuid, feedback)
                     navController.popBackStack("running", inclusive = false)
                 },
-                previousFeedback = previousFeedback
+                previousFeedback = previousFeedback,
+                onCreateCourseClick = {
+                    navController.navigate("course/register_form")
+                }
             )
         }
         composable("level") {

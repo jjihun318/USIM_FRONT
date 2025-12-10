@@ -7,6 +7,7 @@ import com.example.runnershigh.data.remote.*
 import com.example.runnershigh.data.remote.dto.*
 import com.example.runnershigh.data.repository.*
 import com.example.runnershigh.domain.model.*
+import com.example.runnershigh.util.GpxManager
 
 import com.naver.maps.geometry.LatLng
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +47,24 @@ class RunningViewModel : ViewModel() {
     private val _submittedFeedback = MutableStateFlow<List<SubmittedFeedback>>(emptyList())
     val submittedFeedback: StateFlow<List<SubmittedFeedback>> = _submittedFeedback
 
+    private val _lastRunForCourse = MutableStateFlow<CompletedRunData?>(null)
+    val lastRunForCourse: StateFlow<CompletedRunData?> = _lastRunForCourse
+
+    private val _userCourses = MutableStateFlow<List<RunningCourseDto>>(emptyList())
+    val userCourses: StateFlow<List<RunningCourseDto>> = _userCourses
+
+    private val _coursesLoading = MutableStateFlow(false)
+    val coursesLoading: StateFlow<Boolean> = _coursesLoading
+
+    private val _courseError = MutableStateFlow<String?>(null)
+    val courseError: StateFlow<String?> = _courseError
+
+    private val _courseSaveState = MutableStateFlow<CourseSaveState>(CourseSaveState.Idle)
+    val courseSaveState: StateFlow<CourseSaveState> = _courseSaveState
+
+    private val _selectedCourse = MutableStateFlow<RunningCourseDto?>(null)
+    val selectedCourse: StateFlow<RunningCourseDto?> = _selectedCourse
+
     fun applyPlanGoalFromPlan(goal: RunningPlanGoal) {
         _planGoal.update { previous ->
             previous.copy(
@@ -82,6 +101,8 @@ class RunningViewModel : ViewModel() {
                     _compareState.value = null
                     _resultState.value = null
                     _submittedFeedback.value = emptyList()
+                    _courseSaveState.value = CourseSaveState.Idle
+                    _lastRunForCourse.value = null
                     Log.d("RunningVM", "session started: $sessionId")
 
                     // ✅ 세션 시작과 동시에 위치 추적 초기화 + 시작
@@ -153,6 +174,13 @@ class RunningViewModel : ViewModel() {
         val goalCompleted = (goal.targetDistanceKm > 0 && stats.distanceKm >= goal.targetDistanceKm) &&
                 (goal.targetPaceSecPerKm?.let { stats.paceSecPerKm <= it } ?: true)
         this.userUuid = userUuid
+
+        val locationSnapshot = _locationState.value
+        _lastRunForCourse.value = CompletedRunData(
+            stats = stats,
+            pathPoints = locationSnapshot.pathPoints,
+            gpxPoints = locationSnapshot.gpxPoints
+        )
 
         viewModelScope.launch {
             val result = runningRepository.finishSession(
@@ -232,6 +260,83 @@ class RunningViewModel : ViewModel() {
         }
     }
 
+    fun loadUserCourses(userUuid: String) {
+        if (userUuid.isBlank()) return
+
+        viewModelScope.launch {
+            _coursesLoading.value = true
+            _courseError.value = null
+
+            val result = runningRepository.getRunningCourses(userUuid)
+            result
+                .onSuccess { courses ->
+                    _userCourses.value = courses
+                }
+                .onFailure { e ->
+                    _courseError.value = e.message
+                    Log.e("RunningVM", "loadUserCourses failed", e)
+                }
+
+            _coursesLoading.value = false
+        }
+    }
+
+    fun selectCourse(course: RunningCourseDto) {
+        _selectedCourse.value = course
+
+        val targetPace = if (course.distance > 0 && course.totalTime > 0) {
+            (course.totalTime / course.distance).toInt()
+        } else {
+            null
+        }
+
+        _planGoal.update { current ->
+            current.copy(
+                targetDistanceKm = course.distance.takeIf { dist -> dist > 0 } ?: current.targetDistanceKm,
+                targetPaceSecPerKm = targetPace ?: current.targetPaceSecPerKm,
+                planTitle = if (course.name.isNotBlank()) course.name else current.planTitle
+            )
+        }
+    }
+
+    fun resetCourseSaveState() {
+        _courseSaveState.value = CourseSaveState.Idle
+    }
+
+    fun saveCourseFromLastRun(userUuid: String, courseName: String) {
+        val latestRun = _lastRunForCourse.value
+        if (latestRun == null) {
+            _courseSaveState.value = CourseSaveState.Error("최근 러닝 기록을 찾을 수 없습니다.")
+            return
+        }
+
+        if (courseName.isBlank()) {
+            _courseSaveState.value = CourseSaveState.Error("코스 이름을 입력해주세요.")
+            return
+        }
+
+        viewModelScope.launch {
+            _courseSaveState.value = CourseSaveState.Loading
+            val result = runningRepository.createRunningCourse(
+                userUuid,
+                courseName,
+                latestRun.stats,
+                latestRun.gpxPoints
+            )
+
+            result
+                .onSuccess { response ->
+                    _courseSaveState.value = CourseSaveState.Success(response)
+                    loadUserCourses(userUuid)
+                }
+                .onFailure { e ->
+                    val message = e.message ?: "코스 등록에 실패했습니다."
+                    _courseSaveState.value = CourseSaveState.Error(message)
+                    Log.e("RunningVM", "saveCourseFromLastRun failed", e)
+                }
+        }
+    }
+
     // ----------------------------------------------------
     // 위치/거리 계산 로직
     // ----------------------------------------------------
@@ -257,6 +362,12 @@ class RunningViewModel : ViewModel() {
 
         val newPoint = LatLng(lat, lng)
         val oldPoints = state.pathPoints
+        val newGpxPoint = GpxLocationPoint(
+            latitude = lat,
+            longitude = lng,
+            elevation = elevationM ?: state.currentElevationM,
+            timestampIsoUtc = GpxManager.getIso8601Time()
+        )
 
         val additionalDistance = if (oldPoints.isNotEmpty()) {
             val lastPoint = oldPoints.last()
@@ -267,6 +378,7 @@ class RunningViewModel : ViewModel() {
 
         val newPath = oldPoints + newPoint
         val newTotal = state.totalDistanceMeters + additionalDistance
+        val newGpxPoints = state.gpxPoints + newGpxPoint
 
         val currentElevation = elevationM ?: state.currentElevationM
         val gainedElevation = if (elevationM != null && oldPoints.isNotEmpty()) {
@@ -280,11 +392,25 @@ class RunningViewModel : ViewModel() {
             pathPoints = newPath,
             totalDistanceMeters = newTotal,
             currentElevationM = currentElevation,
-            totalElevationGainM = state.totalElevationGainM + gainedElevation
+            totalElevationGainM = state.totalElevationGainM + gainedElevation,
+            gpxPoints = newGpxPoints
         )
 
         // 🔸 여기서 원하면 동시에 서버로 업로드도 가능
         // val timestamp = ...
         // uploadGpsPoint(lat, lng, timestamp)
     }
+}
+
+data class CompletedRunData(
+    val stats: RunningStats,
+    val pathPoints: List<LatLng>,
+    val gpxPoints: List<GpxLocationPoint>
+)
+
+sealed class CourseSaveState {
+    object Idle : CourseSaveState()
+    object Loading : CourseSaveState()
+    data class Success(val response: RunningCourseResponse) : CourseSaveState()
+    data class Error(val message: String) : CourseSaveState()
 }

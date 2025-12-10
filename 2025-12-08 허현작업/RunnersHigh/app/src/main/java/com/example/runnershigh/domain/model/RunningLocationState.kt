@@ -13,5 +13,6 @@ data class RunningLocationState(
     val pathPoints: List<LatLng> = emptyList(),
     val totalDistanceMeters: Double = 0.0,
     val currentElevationM: Double = 0.0,
-    val totalElevationGainM: Double = 0.0
+    val totalElevationGainM: Double = 0.0,
+    val gpxPoints: List<GpxLocationPoint> = emptyList()
 )

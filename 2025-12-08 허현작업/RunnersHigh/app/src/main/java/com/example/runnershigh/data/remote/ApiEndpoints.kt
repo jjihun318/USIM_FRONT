@@ -106,8 +106,13 @@ object ApiEndpoints {
     const val SEND_HEALTH_DATA_API: String = "https://sync-health-data-api-snaufxsgxq-du.a.run.app"
 
     //코스 크리에이터 연동.
+
+    //내 코스 목록 조회 기능을 수행합니다. 이 API는 사용자가 생성하거나 저장한 러닝 코스 리스트를 (러닝 종료 후 세션 기록에서.)가져오는 데 사용됩니다
     const val GET_RUNNING_COURSES: String = "https://get-running-courses-snaufxsgxq-du.a.run.app"
+
+    //코스 등록 기능을 수행합니다. 사용자가 새로운 러닝 코스를 생성하여 서버에 저장할 때 호출됩니다
     const val CREATE_RUNNING_COURSE: String = "https://create-running-course-snaufxsgxq-du.a.run.app"
+
 
 
 }

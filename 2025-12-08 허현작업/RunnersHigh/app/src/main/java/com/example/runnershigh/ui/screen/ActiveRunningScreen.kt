@@ -42,6 +42,7 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.naver.maps.geometry.LatLng
 import com.naver.maps.map.CameraUpdate
 import com.naver.maps.map.NaverMap
 import com.naver.maps.map.OnMapReadyCallback
@@ -55,7 +56,8 @@ fun ActiveRunningScreen(
     runningViewModel: RunningViewModel,
     onStop: () -> Unit,
     onMenuClick: () -> Unit = {},
-    onFinish: (RunningStats) -> Unit = {}
+    onFinish: (RunningStats) -> Unit = {},
+    selectedCoursePath: List<LatLng> = emptyList()
 ) {
     val context = LocalContext.current
     val healthManager = remember { HealthConnectManager(context) }
@@ -153,6 +155,7 @@ fun ActiveRunningScreen(
                         onNewLocation = { lat, lng, elevation ->
                             runningViewModel.onNewLocation(lat, lng, elevation)
                         },
+                        coursePath = selectedCoursePath,
                         onLongPress = { showOverlay = true },
                         modifier = Modifier.fillMaxSize()
                     )
@@ -218,6 +221,7 @@ private fun ActiveRunningMapSection(
     locationState: RunningLocationState,
     isRunning: Boolean,
     onNewLocation: (Double, Double, Double?) -> Unit,
+    coursePath: List<LatLng>,
     onLongPress: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -229,6 +233,8 @@ private fun ActiveRunningMapSection(
 
     var naverMap by remember { mutableStateOf<NaverMap?>(null) }
     var polyline by remember { mutableStateOf<PolylineOverlay?>(null) }
+    var coursePolyline by remember { mutableStateOf<PolylineOverlay?>(null) }
+    var courseCameraInitialized by remember { mutableStateOf(false) }
 
     // 위치 콜백 정의 (remember 로 한 번만 생성)
     val locationCallback = remember {
@@ -238,6 +244,14 @@ private fun ActiveRunningMapSection(
                     onNewLocation(location.latitude, location.longitude, location.altitude)
                 }
             }
+        }
+    }
+
+    LaunchedEffect(coursePath) {
+        courseCameraInitialized = false
+        if (coursePath.isEmpty()) {
+            coursePolyline?.map = null
+            coursePolyline = null
         }
     }
 
@@ -307,23 +321,46 @@ private fun ActiveRunningMapSection(
                 val map = naverMap
                 val line = polyline
 
-                if (map != null && line != null) {
-                    val points = locationState.pathPoints
+                if (map != null) {
+                    if (coursePath.size >= 2) {
+                        val targetCourseLine = coursePolyline ?: PolylineOverlay().apply {
+                            color = 0xFF1976D2.toInt()
+                            width = 10
+                            this.map = map
+                        }
 
-                    // 1) 선 그리기: 좌표가 2개 이상일 때만
-                    if (points.size >= 2) {
-                        line.coords = points
+                        targetCourseLine.coords = coursePath
+                        coursePolyline = targetCourseLine
+
+                        if (!courseCameraInitialized) {
+                            val firstPoint = coursePath.first()
+                            map.moveCamera(CameraUpdate.scrollTo(firstPoint))
+                            courseCameraInitialized = true
+                        }
+                    } else {
+                        coursePolyline?.map = null
+                        coursePolyline = null
+                        courseCameraInitialized = false
                     }
 
-                    // 2) 카메라 + 파란 점(현재 위치 오버레이)
-                    if (points.isNotEmpty()) {
-                        val last = points.last()
-                        val cameraUpdate = CameraUpdate.scrollTo(last)
-                        map.moveCamera(cameraUpdate)
+                    if (line != null) {
+                        val points = locationState.pathPoints
 
-                        val overlay = map.locationOverlay
-                        overlay.isVisible = true
-                        overlay.position = last
+                        // 1) 선 그리기: 좌표가 2개 이상일 때만
+                        if (points.size >= 2) {
+                            line.coords = points
+                        }
+
+                        // 2) 카메라 + 파란 점(현재 위치 오버레이)
+                        if (points.isNotEmpty()) {
+                            val last = points.last()
+                            val cameraUpdate = CameraUpdate.scrollTo(last)
+                            map.moveCamera(cameraUpdate)
+
+                            val overlay = map.locationOverlay
+                            overlay.isVisible = true
+                            overlay.position = last
+                        }
                     }
                 }
             }

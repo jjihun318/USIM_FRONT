@@ -34,12 +34,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.runnershigh.data.remote.dto.RunningCourseDto
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MyCourseScreen(
     onBackClick: () -> Unit,
-    onRegisterFromRecentClick: () -> Unit
+    onRegisterFromRecentClick: () -> Unit,
+    courses: List<RunningCourseDto>,
+    isLoading: Boolean,
+    errorMessage: String?,
+    onCourseSelect: (RunningCourseDto) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -106,7 +111,7 @@ fun MyCourseScreen(
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = "총 2개",
+                text = "총 ${courses.size}개",
                 fontSize = 14.sp,
                 color = Color.Gray
             )
@@ -135,19 +140,31 @@ fun MyCourseScreen(
             modifier = Modifier.padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            MyCourseCard(
-                courseName = "김광석 거리 야간 러닝",
-                rating = "4.8",
-                distance = "5.2km",
-                tags = listOf("#본격적 중급", "#어느 러닝 추천", "#기력에 맞음")
-            )
+            when {
+                isLoading -> {
+                    Text(text = "코스를 불러오는 중입니다...", color = Color.Gray)
+                }
 
-            MyCourseCard(
-                courseName = "두류공원 아침 조깅",
-                rating = "4.8",
-                distance = "5.2km",
-                tags = listOf("#본격적 중급", "#어느 러닝 추천", "#기력에 맞음")
-            )
+                errorMessage != null -> {
+                    Text(text = errorMessage, color = Color(0xFFE53935))
+                }
+
+                courses.isEmpty() -> {
+                    Text(text = "등록된 코스가 없습니다. 새 코스를 등록해보세요!", color = Color.Gray)
+                }
+
+                else -> {
+                    courses.forEach { course ->
+                        MyCourseCard(
+                            courseName = course.name,
+                            rating = "-",
+                            distance = String.format("%.2f km", course.distance),
+                            tags = emptyList(),
+                            onSelect = { onCourseSelect(course) }
+                        )
+                    }
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -159,7 +176,8 @@ fun MyCourseCard(
     courseName: String,
     rating: String,
     distance: String,
-    tags: List<String>
+    tags: List<String>,
+    onSelect: () -> Unit
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -228,7 +246,7 @@ fun MyCourseCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
-                    onClick = {},
+                    onClick = onSelect,
                     modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Color.White

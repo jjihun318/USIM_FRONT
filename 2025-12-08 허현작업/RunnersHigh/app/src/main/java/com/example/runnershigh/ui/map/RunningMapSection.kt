@@ -39,7 +39,8 @@ private const val LOCATION_PERMISSION_REQUEST_CODE = 1000
  */
 @Composable
 fun RunningMapSection(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    coursePath: List<LatLng> = emptyList()
 ) {
     val context = LocalContext.current
     val activity = context as Activity
@@ -53,6 +54,16 @@ fun RunningMapSection(
     }
 
     var isMapInitialized by remember { mutableStateOf(false) }
+    var coursePolyline by remember { mutableStateOf<com.naver.maps.map.overlay.PolylineOverlay?>(null) }
+    var courseCameraInitialized by remember { mutableStateOf(false) }
+
+    LaunchedEffect(coursePath) {
+        courseCameraInitialized = false
+        if (coursePath.isEmpty()) {
+            coursePolyline?.map = null
+            coursePolyline = null
+        }
+    }
 
     // 🔹 런타임 권한 요청 런처
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -126,8 +137,49 @@ fun RunningMapSection(
                         } else {
                             moveToDefaultLocation(naverMap)
                         }
+
+                        if (coursePath.size >= 2) {
+                            val pathLine = com.naver.maps.map.overlay.PolylineOverlay().apply {
+                                color = 0xFF1976D2.toInt()
+                                width = 10
+                                coords = coursePath
+                                map = naverMap
+                            }
+                            coursePolyline = pathLine
+                            courseCameraInitialized = true
+                            naverMap.moveCamera(CameraUpdate.scrollTo(coursePath.first()))
+                        }
                     }
                 })
+            }
+
+            if (isMapInitialized && coursePath.size >= 2) {
+                val map = coursePolyline?.map
+                if (map != null) {
+                    coursePolyline?.coords = coursePath
+                    if (!courseCameraInitialized) {
+                        map.moveCamera(CameraUpdate.scrollTo(coursePath.first()))
+                        courseCameraInitialized = true
+                    }
+                } else if (coursePolyline == null) {
+                    // map이 준비된 상태에서 새로 path 를 주입한 경우
+                    view.getMapAsync { mapReady ->
+                        coursePolyline = com.naver.maps.map.overlay.PolylineOverlay().apply {
+                            color = 0xFF1976D2.toInt()
+                            width = 10
+                            coords = coursePath
+                            this.map = mapReady
+                        }
+                        if (!courseCameraInitialized) {
+                            mapReady.moveCamera(CameraUpdate.scrollTo(coursePath.first()))
+                            courseCameraInitialized = true
+                        }
+                    }
+                }
+            } else if (coursePath.isEmpty() && coursePolyline != null) {
+                coursePolyline?.map = null
+                coursePolyline = null
+                courseCameraInitialized = false
             }
         }
     )

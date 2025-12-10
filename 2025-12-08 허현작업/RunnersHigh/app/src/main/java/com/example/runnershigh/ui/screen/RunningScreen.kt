@@ -39,6 +39,7 @@ import java.util.Locale
 import com.example.runnershigh.data.remote.ApiClient
 import com.example.runnershigh.data.remote.dto.TodayPlanResponse
 import com.example.runnershigh.data.remote.dto.UserIdRequest
+import com.example.runnershigh.data.remote.dto.RunningCourseDto
 import com.example.runnershigh.domain.model.RunningPlanGoal
 
 import com.example.runnershigh.domain.model.RunningStats
@@ -47,6 +48,7 @@ import com.example.runnershigh.ui.theme.RacingSansOne
 import com.example.runnershigh.ui.map.*
 import com.example.runnershigh.ui.screen.level.BadgeActivity   // 🔹 레벨/배지 액티비티
 import com.example.runnershigh.ui.screen.level.LevelActivity
+import com.naver.maps.geometry.LatLng
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -74,6 +76,10 @@ fun RunningScreen(
     var todayPlan by remember { mutableStateOf<TodayPlanResponse?>(null) }
     var todayPlanError by remember { mutableStateOf<String?>(null) }
     val planGoal by runningViewModel.planGoal.collectAsState(initial = RunningPlanGoal())
+    val selectedCourse by runningViewModel.selectedCourse.collectAsState()
+    val selectedCoursePath = remember(selectedCourse) {
+        selectedCourse?.toLatLngPath().orEmpty()
+    }
 
     LaunchedEffect(userUuid) {
         if (userUuid.isBlank()) return@LaunchedEffect
@@ -152,7 +158,8 @@ fun RunningScreen(
                 runningViewModel = runningViewModel,   // ViewModel 전달
                 onStop = { handleStopOnly() },
                 onMenuClick = onMenuClick,
-                onFinish = { stats -> handleFinish(stats) }
+                onFinish = { stats -> handleFinish(stats) },
+                selectedCoursePath = selectedCoursePath
             )
             return
         }
@@ -202,7 +209,8 @@ fun RunningScreen(
             // 🔵 지도: Box 영역 전체를 채우도록 배경에 깔기
             RunningMapSection(
                 modifier = Modifier
-                    .matchParentSize()
+                    .matchParentSize(),
+                coursePath = selectedCoursePath
             )
 
             // 🔵 오늘의 플랜 카드: 지도 위에 떠 있는 형태
@@ -214,6 +222,11 @@ fun RunningScreen(
                     .align(Alignment.TopCenter)
                     .padding(top = 8.dp)
             )
+        }
+
+        selectedCourse?.let { course ->
+            SelectedCourseInfo(course = course)
+            Spacer(modifier = Modifier.height(12.dp))
         }
 
         // Divider
@@ -298,6 +311,50 @@ fun RunningScreen(
             )
         }
     }
+}
+
+@Composable
+private fun SelectedCourseInfo(course: RunningCourseDto) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = Color(0xFFE8F5E8),
+        shadowElevation = 2.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(text = "선택한 코스", fontSize = 14.sp, color = Color(0xFF2E7D32))
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = course.name.ifBlank { "이름 없는 코스" }, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(text = String.format(Locale.getDefault(), "%.2f km", course.distance))
+                if (course.totalTime > 0) {
+                    Text(text = formatCourseTime(course.totalTime))
+                }
+            }
+        }
+    }
+}
+
+private fun formatCourseTime(totalSeconds: Int): String {
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
+}
+
+private fun RunningCourseDto.toLatLngPath(): List<LatLng> {
+    val path = if (pathData.isNotEmpty()) {
+        pathData.map { LatLng(it.lat, it.lng) }
+    } else {
+        waypoints.map { LatLng(it.lat, it.lng) }
+    }
+
+    return path
+        .filter { point ->
+            !point.latitude.isNaN() && !point.longitude.isNaN()
+        }
 }
 
 private fun TodayPlanResponse.toRunningPlanGoal(): RunningPlanGoal? {

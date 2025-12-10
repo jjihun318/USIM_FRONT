@@ -1,14 +1,10 @@
 package com.example.runnershigh.data.repository
 
-import android.util.Base64
 import com.example.runnershigh.data.remote.ApiClient
 import com.example.runnershigh.data.remote.dto.*
 import com.example.runnershigh.domain.model.*
+import com.example.runnershigh.util.GpxManager
 import com.naver.maps.geometry.LatLng
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
 
 
 /**
@@ -216,14 +212,15 @@ class RunningRepository(
         userUuid: String,
         courseName: String,
         stats: RunningStats,
-        pathPoints: List<LatLng>
+        gpxPoints: List<GpxLocationPoint>
     ): Result<RunningCourseResponse> {
-        if (pathPoints.size < 2) {
+        if (gpxPoints.size < 2) {
             return Result.failure(IllegalArgumentException("러닝 경로가 부족합니다."))
         }
 
+        val pathPoints = gpxPoints.map { LatLng(it.latitude, it.longitude) }
         val cumulativeDistances = buildCumulativeDistances(pathPoints)
-        val gpxBase64 = generateGpxBase64(pathPoints, stats.durationSec)
+        val gpxBase64 = generateGpxBase64(gpxPoints)
         val sanitizedFileName = courseName.ifBlank { "course" }
             .replace("\\s+".toRegex(), "_")
             .plus(".gpx")
@@ -271,35 +268,10 @@ class RunningRepository(
         return result
     }
 
-    private fun generateGpxBase64(points: List<LatLng>, durationSeconds: Int): String {
+    private fun generateGpxBase64(points: List<GpxLocationPoint>): String {
         if (points.isEmpty()) return ""
 
-        val startMillis = System.currentTimeMillis() - durationSeconds * 1000L
-        val intervalMillis = if (points.size > 1) {
-            durationSeconds * 1000L / (points.size - 1)
-        } else {
-            0L
-        }
-
-        val formatter = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }
-
-        val builder = StringBuilder()
-        builder.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-        builder.append("<gpx version=\"1.1\" creator=\"RunnersHigh\">\n<trk>\n<trkseg>\n")
-
-        points.forEachIndexed { index, point ->
-            val time = formatter.format(Date(startMillis + intervalMillis * index))
-            builder.append("<trkpt lat=\"${point.latitude}\" lon=\"${point.longitude}\">")
-            builder.append("<time>$time</time></trkpt>\n")
-        }
-
-        builder.append("</trkseg>\n</trk>\n</gpx>")
-
-        return Base64.encodeToString(
-            builder.toString().toByteArray(Charsets.UTF_8),
-            Base64.NO_WRAP
-        )
+        val xml = GpxManager.createGpxXmlString(points)
+        return GpxManager.encodeToBase64(xml)
     }
 }
