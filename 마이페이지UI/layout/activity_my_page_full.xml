@@ -1,0 +1,67 @@
+<!--  activity_my_page_full.xml - ScrollView + 하단 고정 버튼 통합 레이아웃  -->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#FFFFFF">
+    <!--  하단 고정 버튼 바  -->
+    <LinearLayout android:id="@+id/bottomBar" android:layout_width="match_parent" android:layout_height="56dp" android:layout_alignParentBottom="true" android:orientation="horizontal" android:background="#FFFFFF" android:elevation="4dp" android:weightSum="2">
+        <TextView android:id="@+id/btnLogout" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="로그아웃" android:textSize="15sp" android:textColor="#333333" android:gravity="center" android:background="?attr/selectableItemBackground"/>
+        <View android:layout_width="1dp" android:layout_height="match_parent" android:background="#DDDDDD"/>
+        <TextView android:id="@+id/btnWithdraw" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:text="회원 탈퇴" android:textSize="15sp" android:textColor="#333333" android:gravity="center" android:background="?attr/selectableItemBackground"/>
+    </LinearLayout>
+    <!--  상단 구분선 (bottom bar 위)  -->
+    <View android:id="@+id/dividerBottom" android:layout_width="match_parent" android:layout_height="1dp" android:layout_above="@id/bottomBar" android:background="#EEEEEE"/>
+    <!--  스크롤 컨텐츠 영역  -->
+    <ScrollView android:layout_width="match_parent" android:layout_height="match_parent" android:layout_above="@id/dividerBottom" android:fillViewport="true">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:paddingStart="20dp" android:paddingEnd="20dp" android:paddingBottom="16dp">
+            <!--  ── 타이틀 ──  -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="마이페이지" android:textSize="20sp" android:textStyle="bold" android:textColor="#222222" android:paddingTop="20dp" android:paddingBottom="16dp"/>
+            <!--  ── 프로필 행 ──  -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:paddingBottom="20dp">
+                <!--  프로필 이미지 + 'user' 레이블  -->
+                <LinearLayout android:layout_width="wrap_content" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center_horizontal">
+                    <!--  원형 회색 배경 프로필 이미지  -->
+                    <ImageView android:layout_width="64dp" android:layout_height="64dp" android:background="@drawable/circle_gray_bg" android:src="@android:drawable/ic_menu_myplaces" android:padding="14dp" app:tint="#AAAAAA" android:scaleType="fitCenter"/>
+                </LinearLayout>
+                <!--  닉네임 / 레벨  -->
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical" android:gravity="end">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="User_name" android:textSize="16sp" android:textStyle="bold|italic" android:textColor="#222222"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Level 2" android:textSize="14sp" android:textStyle="bold|italic" android:textColor="#222222" android:paddingTop="2dp"/>
+                </LinearLayout>
+            </LinearLayout>
+            <!--  ── 정보 카드 2열 ──  -->
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:weightSum="2" android:layout_marginBottom="24dp">
+                <!--  왼쪽 카드: 성별 / 키 / 몸무게  -->
+                <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:background="@drawable/card_green_bg" android:padding="16dp" android:layout_marginEnd="6dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="남성" android:textSize="15sp" android:textColor="#333333" android:paddingBottom="12dp"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="180cm" android:textSize="16sp" android:textStyle="bold" android:textColor="#333333" android:paddingBottom="8dp"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="75kg" android:textSize="16sp" android:textStyle="bold" android:textColor="#333333"/>
+                </LinearLayout>
+                <!--  오른쪽 카드: 배지  -->
+                <LinearLayout android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:orientation="vertical" android:background="@drawable/card_green_bg" android:padding="16dp" android:layout_marginStart="6dp">
+                    <!--  배지 헤더 행  -->
+                    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+                        <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:text="배지" android:textSize="15sp" android:textColor="#333333"/>
+
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="›" android:textSize="18sp" android:textColor="#666666"/>
+                    </LinearLayout>
+                    <!--  award 레이블  -->
+                    <!--  배지 아이콘  -->
+                    <ImageView android:layout_width="52dp" android:layout_height="52dp" android:src="@android:drawable/btn_star_big_off" app:tint="#AAAAAA" android:layout_gravity="center_horizontal" android:paddingTop="4dp" android:scaleType="fitCenter"/>
+                </LinearLayout>
+            </LinearLayout>
+            <!--  ── 닉네임 변경 ──  -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="닉네임 변경" android:textSize="15sp" android:textColor="#222222" android:textStyle="bold" android:paddingBottom="8dp"/>
+            <EditText android:id="@+id/etNickname" android:layout_width="match_parent" android:layout_height="48dp" android:background="@drawable/input_green_bg" android:hint="새로운 닉네임을 입력해주세요." android:textSize="13sp" android:textColor="#333333" android:paddingStart="14dp" android:paddingEnd="14dp" android:inputType="text" android:layout_marginBottom="24dp"/>
+            <!--  ── 신체 정보 변경 ──  -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="신체 정보 변경" android:textSize="15sp" android:textColor="#222222" android:textStyle="bold" android:paddingBottom="12dp"/>
+            <!--  키  -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="키(cm)" android:textSize="13sp" android:textColor="#444444" android:paddingBottom="6dp"/>
+            <EditText android:id="@+id/etHeight" android:layout_width="match_parent" android:layout_height="48dp" android:background="@drawable/input_green_bg" android:hint="키를 입력해주세요." android:textSize="13sp" android:textColor="#333333" android:paddingStart="14dp" android:paddingEnd="14dp" android:inputType="numberDecimal" android:layout_marginBottom="16dp"/>
+            <!--  몸무게  -->
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="몸무게(kg)" android:textSize="13sp" android:textColor="#444444" android:paddingBottom="6dp"/>
+            <EditText android:id="@+id/etWeight" android:layout_width="match_parent" android:layout_height="48dp" android:background="@drawable/input_green_bg" android:hint="키를 입력해주세요." android:textSize="13sp" android:textColor="#333333" android:paddingStart="14dp" android:paddingEnd="14dp" android:inputType="numberDecimal" android:layout_marginBottom="16dp"/>
+        </LinearLayout>
+    </ScrollView>
+</RelativeLayout>
